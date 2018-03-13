@@ -6,9 +6,15 @@
     "react": "^16.2.0",
     "react-dom": "^16.2.0",
     "react-scripts": "1.1.1",
+    "truffle-contract": "^3.0.4",
+    "web3": "^1.0.0-beta.30",
     "zeppelin-solidity": "^1.7.0"
   },
+  "devDependencies": {
+    "solhint": "^1.1.10"
+  },
   "scripts": {
+    "contractLink": "cd src && ln -s ../build/contracts contracts && cd ..",
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test --env=jsdom",
