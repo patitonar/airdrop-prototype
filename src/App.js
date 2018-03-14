@@ -4,6 +4,7 @@ import './App.css'
 import contract from 'truffle-contract'
 
 import AirdropContract from './contracts/Airdrop'
+import ExampleToken from './contracts/ExampleToken'
 import getWeb3 from './utils/getWeb3'
 
 class App extends Component {
@@ -17,7 +18,7 @@ class App extends Component {
       wip: false,
       formReceipts: '',
       formAmount: '',
-      formAddress: ''
+      formAddress: ExampleToken.networks['5777'].address
     }
   }
 
