@@ -1,14 +1,21 @@
 pragma solidity ^0.4.18;
 
-import 'zeppelin-solidity/contracts/ownership/Ownable.sol';
-import 'zeppelin-solidity/contracts/token/ERC20/BasicToken.sol';
+import './ERC20.sol';
 
-contract Airdrop is Ownable {
-  function runAirdrop(address[] recipients, uint amount, address tokenAddress) public onlyOwner {
-    BasicToken myToken = BasicToken(tokenAddress);
+contract Airdrop {
+
+  function runAirdrop(address[] recipients, uint amount, ERC20 tokenAddress) public {
 
     for (uint i = 0; i < recipients.length; i++) {
-      myToken.transfer(recipients[i], amount);
+      tokenAddress.transfer(recipients[i], amount);
     }
+  }
+
+  function runSingleAirdrop(address recipient, uint amount, ERC20 myToken) public {
+    myToken.transfer(recipient, amount);
+  }
+
+  function balanceOf(ERC20 myToken, address recipient) public constant returns (uint256 balance) {
+    return myToken.balanceOf(recipient);
   }
 }

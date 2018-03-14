@@ -48,7 +48,15 @@ class App extends Component {
           this.state.formAddress,
           {from: accounts[0]}
         )
-      }).finally(() => {
+      }).then(result => console.log(result))
+        .then(() => {
+          const recipients = this.state.formReceipts.split('\n')
+          recipients.forEach(address =>{
+            AirdropInstance.balanceOf(this.state.formAddress, address)
+              .then(result => console.log(address, result.toString()))
+          })
+        })
+        .finally(() => {
         this.setState({wip: false})
       })
     })
