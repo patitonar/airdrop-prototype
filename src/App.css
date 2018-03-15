@@ -14,6 +14,10 @@
   font-size: 1.5em;
 }
 
+.App-form {
+  margin-bottom: 50px;
+}
+
 .App-form * {
   margin: auto auto 20px;
 }
@@ -29,5 +33,16 @@
   right: 0;
   bottom: 0;
   left: 0;
-  background: url('./loading.gif') no-repeat center center;
+  background: azure url('loading.gif') no-repeat center center;
+}
+
+.App-balances {
+  margin: auto;
+  padding: 10px;
+  border: black 1px solid;
+  border-radius: 10px;
+}
+
+.App-balances td {
+  padding: 10px;
 }
