@@ -7,39 +7,29 @@ A DApp for Airdrops
 [Ganache](https://github.com/trufflesuite/ganache-cli) - or any other Ethereum RPC client <br />
 [MetaMask](https://metamask.io/)
 
-#### Clone repo
-```
-$ git clone https://github.com/patitonar/airdrop-prototype.git
-```
-
 #### Install dependencies
 Install app dependencies
 ```
 $ yarn
 ```
 
-Install ganache-cli
-```
-npm install -g ganache-cli
-```
-
-#### Running the app
+#### Running the App
 Start ganache-cli
 ```
 $ ganache-cli
 ```
 
-Deploy the contracts
+Build and Deploy the contracts
 ```
-$ truffle migrate
-```
-
-Create Symbolic Link to contracts. This is required only the first time.
-```
-$ yarn contractLink
+$ build:contracts
 ```
 
 Start the app
 ```
 $ yarn start
+```
+
+#### Build for production
+```
+$ yarn build
 ```

@@ -22,16 +22,18 @@ class App extends Component {
       fbMsg: '',
       formReceipts: '',
       formAmount: '',
-      formAddress: ExampleToken.networks['5777'].address
+      formAddress: ''
     }
   }
 
   componentWillMount () {
     getWeb3
-      .then(results =>
-        this.setState({
-          web3: results.web3
-        })
+      .then(results =>{
+          this.setState({web3: results.web3})
+          const token = contract(ExampleToken)
+          token.setProvider(results.web3.currentProvider)
+          token.deployed().then((instance) => this.setState({formAddress: instance.address}))
+      }
       ).catch(() => console.log('Error finding web3.'))
   }
 

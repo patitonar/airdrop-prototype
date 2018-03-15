@@ -17,8 +17,10 @@
   "scripts": {
     "contractLink": "cd src && ln -s ../build/contracts contracts && cd ..",
     "start": "react-scripts start",
-    "build": "react-scripts build",
+    "build": "yarn build:contracts && react-scripts build",
     "test": "react-scripts test --env=jsdom",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "build:contracts": "truffle compile && truffle migrate --reset && yarn contracts:sync-src",
+    "contracts:sync-src": "cp -R build/contracts/ src/contracts"
   }
 }
