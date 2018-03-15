@@ -3,8 +3,8 @@ import './App.css'
 
 import contract from 'truffle-contract'
 
-import AirdropContract from './contracts/Airdrop'
 import ExampleToken from './contracts/ExampleToken'
+import AirdropContract from './contracts/Airdrop'
 import getWeb3 from './utils/getWeb3'
 
 import Balances from './components/Balances'
@@ -39,43 +39,70 @@ class App extends Component {
     const Airdrop = contract(AirdropContract)
     Airdrop.setProvider(this.state.web3.currentProvider)
 
-    let AirdropInstance
-
     this.state.web3.eth.getAccounts((error, accounts) => {
       Airdrop.deployed()
-        .then((instance) => {
-          AirdropInstance = instance
+        .then(AirdropInstance => {
 
           this.setState({wip: true})
 
-          return AirdropInstance.runAirdrop(
-            this.state.formReceipts.split('\n'),
-            this.state.formAmount,
-            this.state.formAddress,
-            {from: accounts[0]}
-          )
+          // todo:
+          // In dev mode we send load to contract and then run
+          // contract transactions to every receipt address.
+          // In prod mode you can go straight to transferToReceipts()
+          //this.transferToReceipts(AirdropInstance, accounts[0])
+          this.loadAndSend(AirdropInstance, accounts[0])
+            .then(() => {
+              this.showBalances(AirdropInstance)
+              this.setState({fbMsg: 'Transaction successfull!'})
+            })
+            .catch(() => this.setState({fbMsg: 'Transaction failed!'}))
+            .finally(() => this.setState({wip: false}))
         })
-        .then(() => {
-          const recipients = this.state.formReceipts.split('\n')
-          const balances = []
-          const promises = []
-          recipients.forEach(address => {
-            promises.push(
-              AirdropInstance.balanceOf(this.state.formAddress, address)
-                .then(result => {
-                  balances.push({address: address, amount: result.toNumber()})
-                })
-            )
-          })
-          Promise.all(promises)
-            .then(() => this.setState({balances, fbMsg: 'Transaction successfull!'}))
-        })
-        .catch(() => this.setState({fbMsg: 'Transaction failed!'}))
-        .finally(() => this.setState({wip: false}))
     })
   }
 
-  handleChange = name => event => {
+  async loadAndSend (AirdropInstance, ownerAddress) {
+    const ExampleTokenContract = contract(ExampleToken)
+    ExampleTokenContract.setProvider(this.state.web3.currentProvider)
+
+    return await ExampleTokenContract.deployed()
+      .then(async inst => {
+        const totalAmount = this.state.formReceipts.trim().split('\n').length * this.state.formAmount
+        return await inst.transfer(AirdropInstance.address, totalAmount, {from: ownerAddress})
+          .then(async () => await this.transferToReceipts(AirdropInstance, ownerAddress))
+      })
+  }
+
+  async transferToReceipts (AirdropInstance, ownerAddress) {
+    return await AirdropInstance.runAirdrop(
+      this.state.formReceipts.split('\n'),
+      this.state.formAmount,
+      this.state.formAddress,
+      {from: ownerAddress})
+  }
+
+  showBalances(AirdropInstance) {
+    try {
+      const recipients = this.state.formReceipts.split('\n')
+      const promises = []
+      const balances = []
+      recipients.forEach(address => {
+        promises.push(
+          AirdropInstance.balanceOf(this.state.formAddress, address)
+            .then(result => {
+              balances.push({address: address, amount: result.toNumber()})
+            })
+        )
+      })
+      Promise
+        .all(promises)
+        .then(() => this.setState({balances}))
+    } catch (err) {
+      console.log("showBalances error:", err)
+    }
+  }
+
+  handleInputChange = name => event => {
     this.setState({
       [name]: event.target.value
     })
@@ -90,13 +117,13 @@ class App extends Component {
         <div className="App-form">
           <label htmlFor="receipts">Receipt addresses</label>
           <textarea name="receipts" cols="45" rows="10" value={this.state.formReceipts}
-                    onChange={this.handleChange('formReceipts')}/>
+                    onChange={this.handleInputChange('formReceipts')}/>
           <label htmlFor="token_address">Token address</label>
           <input type="text" name="address" size="45" value={this.state.formAddress}
-                 onChange={this.handleChange('formAddress')}/>
+                 onChange={this.handleInputChange('formAddress')}/>
           <label htmlFor="amount">Amount</label>
           <input type="text" name="amount" size="45" value={this.state.formAmount}
-                 onChange={this.handleChange('formAmount')}/>
+                 onChange={this.handleInputChange('formAmount')}/>
           <button onClick={() => this.instantiateContract()}>Submit</button>
         </div>
         {this.state.fbMsg && <h3>{this.state.fbMsg}</h3>}

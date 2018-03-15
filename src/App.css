@@ -33,7 +33,7 @@
   right: 0;
   bottom: 0;
   left: 0;
-  background: azure url('loading.gif') no-repeat center center;
+  background: transparent url('loading.gif') no-repeat center center;
 }
 
 .App-balances {
