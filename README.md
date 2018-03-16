@@ -21,7 +21,7 @@ $ ganache-cli
 
 Build and Deploy the contracts
 ```
-$ build:contracts
+$ yarn build:contracts
 ```
 
 Start the app
