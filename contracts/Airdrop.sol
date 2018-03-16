@@ -6,7 +6,6 @@ import "zeppelin-solidity/contracts/ownership/Ownable.sol";
 contract Airdrop is Ownable {
 
   function runAirdrop(address[] recipients, uint amount, ERC20 tokenAddress) public onlyOwner {
-
     for (uint i = 0; i < recipients.length; i++) {
       tokenAddress.transfer(recipients[i], amount);
     }
