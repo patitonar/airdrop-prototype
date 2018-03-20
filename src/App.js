@@ -54,15 +54,17 @@ class App extends Component {
           // In dev mode we send load to contract and then run
           // contract transactions to every receipt address.
           // In prod mode you can go straight to transferToReceipts()
-          this.transferToReceipts(AirdropInstance, accounts[0])
-          //this.loadAndSend(AirdropInstance, ExampleTokenContract, accounts[0])
+          //this.transferToReceipts(AirdropInstance, accounts[0])
+          this.loadAndSend(AirdropInstance, ExampleTokenContract, accounts[0])
             .then(() => {
               this.showBalances(AirdropInstance)
               this.setState({fbMsg: 'Transaction successfull!'})
             })
             .catch(err => {
               this.setState({fbMsg: err.msg || 'Transaction failed!'})
-              console.log(err)
+              if (process.env.DEV) {
+                console.log(err)
+              }
             })
             .finally(() => this.setState({wip: false}))
         })
