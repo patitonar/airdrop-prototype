@@ -8,7 +8,7 @@ contract ExampleToken is StandardToken {
     uint public decimals = 4;
     uint public INITIAL_SUPPLY = 100000000000;
 
-    function ExampleToken() {
+    function ExampleToken() public {
         balances[msg.sender] = INITIAL_SUPPLY;
     }
 }
