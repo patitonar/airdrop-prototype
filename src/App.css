@@ -33,7 +33,8 @@
   right: 0;
   bottom: 0;
   left: 0;
-  background: transparent url('loading.gif') no-repeat center center;
+  background: transparent url('img/loading-default.gif') no-repeat center center;
+  background-size: 180px 180px;
 }
 
 .App-balances {

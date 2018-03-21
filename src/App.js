@@ -15,104 +15,178 @@ class App extends Component {
     super(props)
 
     this.state = {
-      storageValue: 0,
       web3: null,
+      ownerAddress: '',
       balances: [],
+      tokenSymbol: null,
+      ownerBalance: null,
+      contractBalance: null,
       wip: false,
       fbMsg: '',
+      msgCurrentAction: '',
       formReceipts: '',
       formAmount: '',
-      formAddress: ''
+      formAddress: '',
+      tokenInstance: null,
+      airdropInstance: null,
+      noContractsDeployed: false
     }
   }
 
   componentWillMount () {
     getWeb3
-      .then(results =>{
-          this.setState({web3: results.web3})
-          const token = contract(ExampleToken)
-          token.setProvider(results.web3.currentProvider)
-          token.deployed().then(instance => this.setState({formAddress: instance.address}))
+      .then(results => {
+        this.setState({web3: results.web3})
+        results.web3.eth.getAccounts((error, accounts) => this.setState({ownerAddress: accounts[0]}))
+
+        const contractsPromises = []
+
+        const Token = contract(ExampleToken)
+        Token.setProvider(results.web3.currentProvider)
+        contractsPromises.push(
+          Token.deployed()
+            .then(instance => {
+              this.setState({
+                tokenInstance: instance,
+                formAddress: instance.address
+              })
+              return instance.symbol()
+            })
+            .then(symbol => this.setState({tokenSymbol: symbol}))
+        )
+        const Airdrop = contract(AirdropContract)
+        Airdrop.setProvider(results.web3.currentProvider)
+        contractsPromises.push(
+          Airdrop.deployed()
+            .then(instance =>
+              this.setState({
+                airdropInstance: instance
+              })
+            )
+        )
+
+        Promise
+          .all(contractsPromises)
+          .catch(() => this.setState({noContractsDeployed: true}))
+          .finally(() => this.showBalances())
       })
-      .catch(() => console.log('Error finding web3.'))
+      .catch(() => console.log('Error finding web3'))
   }
 
-  instantiateContract () {
-    const Airdrop = contract(AirdropContract)
-    Airdrop.setProvider(this.state.web3.currentProvider)
+  runAirdrop () {
+    this.setState({wip: true})
 
-    this.state.web3.eth.getAccounts((error, accounts) => {
-      Airdrop.deployed()
-        .then(AirdropInstance => {
+    // todo:
+    // In dev mode we send load to contract and then run
+    // contract transactions to every receipt address.
+    // In prod mode you can go straight to transferToReceipts()
+    //this.transferToReceipts(AirdropInstance, accounts[0])
 
-          this.setState({wip: true})
+    this.loadAndSend()
+      .then(() => this.setState({fbMsg: 'Transaction successfull!'}))
+      .catch(err => {
+        this.setState({fbMsg: err.msg || 'Transaction failed!'})
+        process.env.NODE_ENVIRONMENT === 'development' && console.log(err)
+      })
+      .finally(() => {
+        this.showBalances()
+        this.setState({wip: false})
+      })
+  }
 
-          const ExampleTokenContract = contract(ExampleToken)
-          ExampleTokenContract.setProvider(this.state.web3.currentProvider)
+  loadAndSend () {
+    const {tokenInstance, ownerAddress, formReceipts, formAmount, contractBalance} = this.state
 
+    const totalAmount = formReceipts.trim().split('\n').filter(item => item).length * formAmount
+
+    return tokenInstance.balanceOf(ownerAddress)
+      .then(async ownerBalance => {
+        if (totalAmount > contractBalance && totalAmount > ownerBalance.toNumber()) {
+          this.setState({fbMsg: 'Adding tokens to owner address...'})
           // todo:
-          // In dev mode we send load to contract and then run
-          // contract transactions to every receipt address.
-          // In prod mode you can go straight to transferToReceipts()
-          //this.transferToReceipts(AirdropInstance, accounts[0])
-          this.loadAndSend(AirdropInstance, ExampleTokenContract, accounts[0])
-            .then(() => {
-              this.showBalances(AirdropInstance)
-              this.setState({fbMsg: 'Transaction successfull!'})
+          // return Promise.reject() when prod env
+          return await tokenInstance.addTokens(ownerAddress, totalAmount - ownerBalance.toNumber(), {from: ownerAddress})
+            .then(async () => {
+              this.setState({ownerBalance: totalAmount})
+              return await this.transferTokens(totalAmount)
             })
-            .catch(err => {
-              this.setState({fbMsg: err.msg || 'Transaction failed!'})
-              if (process.env.DEV) {
-                console.log(err)
-              }
-            })
-            .finally(() => this.setState({wip: false}))
-        })
-    })
+          //return Promise.reject({msg: 'Owner balance is not enough!'})
+        } else {
+          return await this.transferTokens(totalAmount)
+        }
+      })
+      .then(promise => promise)
   }
 
-  async loadAndSend (AirdropInstance, ExampleTokenContract, ownerAddress) {
-    return await ExampleTokenContract.deployed()
-      .then(async ExampleTokenInstace => {
-        const totalAmount = this.state.formReceipts.trim().split('\n').length * this.state.formAmount
+  transferTokens (totalAmount) {
+    const {airdropInstance, tokenInstance, ownerAddress} = this.state
 
-        return await ExampleTokenInstace.balanceOf(ownerAddress)
-          .then(async ownerBalance => {
-            if (totalAmount > ownerBalance.toNumber()) {
-              return Promise.reject({msg: 'Owner balance is not enough!'})
-            }
-            return await ExampleTokenInstace.transfer(AirdropInstance.address, totalAmount, {from: ownerAddress})
-              .then(async () => await this.transferToReceipts(AirdropInstance, ownerAddress))
-          })
+    return tokenInstance.balanceOf(airdropInstance.address)
+      .then(async contractBalance => {
+        const airdropBalance = contractBalance.toNumber()
+        if (airdropBalance < totalAmount) {
+          this.setState({fbMsg: 'Sending tokens to airdrop contract...'})
+          const transferAmount = totalAmount - airdropBalance
+          return await tokenInstance.transfer(airdropInstance.address, transferAmount, {from: ownerAddress})
+            .then(() => {
+              this.setState(prevState => ({
+                contractBalance: totalAmount,
+                ownerBalance: prevState.ownerBalance - transferAmount
+              }))
+              return this.transferToReceipts()
+            })
+        }
+        return this.transferToReceipts()
       })
   }
 
-  async transferToReceipts (AirdropInstance, ownerAddress) {
-    return await AirdropInstance.runAirdrop(
-      this.state.formReceipts.split('\n'),
+  transferToReceipts () {
+    const {airdropInstance, ownerAddress} = this.state
+
+    this.setState({fbMsg: 'Airdropping tokens to receipts...'})
+    return airdropInstance.runAirdrop(
+      this.state.formReceipts.split('\n').filter(item => item),
       this.state.formAmount,
       this.state.formAddress,
       {from: ownerAddress})
   }
 
-  showBalances(AirdropInstance) {
+  showBalances () {
+    const {airdropInstance, tokenInstance, ownerAddress, formReceipts} = this.state
+    if (!tokenInstance || !airdropInstance) {
+      return console.log('Error: no contracts instances found')
+    }
     try {
-      const recipients = this.state.formReceipts.split('\n')
+      const recipients = formReceipts.split('\n').filter(item => item)
       const promises = []
       const balances = []
+      let ownerBalance
+      let contractBalance
       recipients.forEach(address => {
         promises.push(
-          AirdropInstance.balanceOf(this.state.formAddress, address)
-            .then(result => {
-              balances.push({address: address, amount: result.toNumber()})
-            })
+          tokenInstance.balanceOf(address)
+            .then(result => balances.push({address: address, amount: result.toNumber()}))
         )
       })
+      promises.push(
+        tokenInstance.balanceOf(ownerAddress)
+          .then(async result => ownerBalance = await result.toNumber())
+      )
+      promises.push(
+        tokenInstance.balanceOf(airdropInstance.address)
+          .then(async result => contractBalance = await result.toNumber())
+      )
       Promise
         .all(promises)
-        .then(() => this.setState({balances}))
+        .then(() =>
+          this.setState({
+            balances,
+            ownerBalance,
+            contractBalance
+          })
+        )
     } catch (err) {
-      console.log("showBalances() error:", err)
+      console.log('Show balances error:', err)
     }
   }
 
@@ -123,26 +197,37 @@ class App extends Component {
   }
 
   render () {
+    const {
+      ownerBalance, contractBalance, formReceipts, formAddress, formAmount, noContractsDeployed, fbMsg,
+      balances, wip, msgCurrentAction, tokenSymbol
+    } = this.state
     return (
       <div className="App">
         <header className="App-header">
           <h1 className="App-title">Ethereum Airdrop</h1>
         </header>
+        <div>
+          <p>Owner tokens balance: {Number.isInteger(ownerBalance) ? `${ownerBalance} ${tokenSymbol}` : '-'}</p>
+          <p>Airdrop contract tokens
+            balance: {Number.isInteger(contractBalance) ? `${contractBalance} ${tokenSymbol}` : '-'}</p>
+        </div>
         <div className="App-form">
           <label htmlFor="receipts">Receipt addresses</label>
-          <textarea name="receipts" cols="45" rows="10" value={this.state.formReceipts}
+          <textarea name="receipts" cols="45" rows="10" value={formReceipts}
                     onChange={this.handleInputChange('formReceipts')}/>
           <label htmlFor="token_address">Token address</label>
-          <input type="text" name="address" size="45" value={this.state.formAddress}
+          <input type="text" name="address" size="45" value={formAddress}
                  onChange={this.handleInputChange('formAddress')}/>
           <label htmlFor="amount">Amount</label>
-          <input type="text" name="amount" size="45" value={this.state.formAmount}
+          <input type="text" name="amount" size="45" value={formAmount}
                  onChange={this.handleInputChange('formAmount')}/>
-          <button onClick={() => this.instantiateContract()}>Submit</button>
+          <button onClick={() => this.runAirdrop()}>Submit</button>
         </div>
-        {this.state.fbMsg && <h3>{this.state.fbMsg}</h3>}
-        <Balances data={this.state.balances}/>
-        {this.state.wip && <div className="App-wip"/>}
+        {noContractsDeployed && <h2>Contracts were not found on selected network</h2>}
+        {fbMsg && <h3>{fbMsg}</h3>}
+        {!!balances.length && <Balances data={balances}/>}
+        {wip && <div>{msgCurrentAction}</div>}
+        {wip && <div className="App-wip"/>}
       </div>
     )
   }
